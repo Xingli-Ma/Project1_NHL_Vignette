@@ -23,115 +23,120 @@ require(ggplot2)
 require(DT)
 library(jsonlite)
 library(httr)
-
-
-require(Hmisc)
-require(expss)
-require(bigrquery)
-require(DBI)
-require(RSQLite)
-library(bigrquery)
-library(DBI)
 ```             
 
+## Introduction
 
-# Introduction      
+I created a vignette for reading and summarizing data from the National Hockey League’s
+(NHL) API. Three main components are present in this vignette: extracting tables and querying information from NFL Records API, extracting tables and querying information from NFL Stats API, and exploratory data analysis.
 
-## NFL Records API         
+## NFL Records API and NFL Stats API 
+
+### Retriving Tables and Quering Information from NFL Records API   
+
+Create a wrapper function to return the records for a given team ID or franchise ID.    
+
+```{r}
+team_Record <- function(teamId_OR_franchiseId, ...){
+  
+  # construct URLs
+  full_url_records <- function(table_name, ...){
+  base_url <- "https://records.nhl.com/site/api"
+  return(paste0(base_url, table_name, ...))
+}
+  franchise <- full_url_records("/franchise?cayenneExp=mostRecentTeamId=", teamId_OR_franchiseId)
+  franchise_teams <- full_url_records("/franchise-team-totals?cayenneExp=teamId=", teamId_OR_franchiseId)
+  franchise_season <- full_url_records("/franchise-season-records?cayenneExp=franchiseId=", teamId_OR_franchiseId)
+  goalie <- full_url_records("/franchise-goalie-records?cayenneExp=franchiseId=", teamId_OR_franchiseId)
+  skater <- full_url_records("/franchise-skater-records?cayenneExp=franchiseId=", teamId_OR_franchiseId)
+  franchise_detail <- full_url_records("/franchise-detail?cayenneExp=mostRecentTeamId=", teamId_OR_franchiseId)
+  
+ # retrieve the NHL records information and convert it to data frames  
+  franchise_record <- jsonlite::fromJSON(content(GET(franchise),"text"),       flatten=TRUE)$data
+  franchise_teams_record <- jsonlite::fromJSON(content(GET(franchise_teams),"text"), flatten=TRUE)$data
+  franchise_season_record <- jsonlite::fromJSON(content(GET(franchise_season),"text"), flatten=TRUE)$data
+  goalie_record <- jsonlite::fromJSON(content(GET(goalie),"text"), flatten=TRUE)$data
+  skater_record <- jsonlite::fromJSON(content(GET(skater),"text"), flatten=TRUE)$data
+  franchise_detail_record <- jsonlite::fromJSON(content(GET(franchise_detail),"text"), flatten=TRUE)$data 
+  return(list(df1_franchise=franchise_record, df2_teams=franchise_teams_record,   df3_season=franchise_season_record, df4_goalie=goalie_record, df5_skater=skater_record, df6_adminDetail=franchise_detail_record))
+}
+
+# Query NHL records information according to the team ID or franchise ID given by a user
+team_Record(2)
+```  
+
+
+### Retriving Tables and Quering Information from NFL Stats API   
+
+Create a wrapper function to return the stats for a given team ID.   
+
+```{r}
+team_Stats <- function(teamID, ...) {
+  # construct URLs
+  full_url_stats <- function(teamID){
+  base_url <- "https://statsapi.web.nhl.com/api/v1/teams/"
+  tab_name <- "/?expand=team.stats"
+  return(paste0(base_url, teamID, tab_name))
+  }
+
+  # retrieve the NHL stats information and convert it to data frames
+  NHLstats <- function(full_url_stats){
+  return(jsonlite::fromJSON(content(GET(full_url_stats),"text"), flatten=TRUE))
+  }
+  
+  teamStatsDf <- NHLstats(full_url_stats(teamID))$teams[[8]][[1]]
+  teamStatsDf$splits[[1]]
+}
+
+# Query NHL stats information according to the team ID or franchise ID given by a user
+team_Stats(1)
+```   
+
+
+## Exploratory Data Analysis   
+
+### Tables Retrieved from NHL Records API   
 
 ```{r}
 library(jsonlite)
 library(httr)
 # construct URLs
-full_url_records <- function(tab_name){
+full_url_records <- function(tabl_name){
   base_url <- "https://records.nhl.com/site/api"
-  return(paste0(base_url, tab_name))
+  return(paste0(base_url, tabl_name))
 }
 franchise <- full_url_records("/franchise")
 franchise_totals <- full_url_records("/franchise-team-totals")
+franchise_season <- full_url_records("/franchise-season-records")
 goalie <- full_url_records("/franchise-goalie-records")
 skater <- full_url_records("/franchise-skater-records")
 admin <- full_url_records("/franchise-detail")
-```       
 
-```{r}
 # retrieve the NHL records information and convert it to data frames
 NHLrecords <- function(full_url_records){
   return(jsonlite::fromJSON(content(GET(full_url_records),"text"), flatten=TRUE))
 }
 franchiseDf <- NHLrecords(franchise)$data
 franchise_totalsDf <- NHLrecords(franchise_totals)$data
+franchise_seasonsDf <- NHLrecords(franchise_season)$data
 goalieDf <- NHLrecords(goalie)$data
 skaterDf <- NHLrecords(skater)$data
 adminDf <- NHLrecords(admin)$data
-franchiseDf
-franchise_totalsDf
-goalieDf
-skaterDf
-adminDf
-```   
-
-
-## NHL Stats API   
-
-### Explore the data     
-
-```{r}
-# construct URLs
-full_url_stats <- function(tab_name, ...){
-  base_url <- "https://statsapi.web.nhl.com/api/v1"
-  return(paste0(base_url, tab_name, ...))
-}
-teamsStat <- full_url_stats("/teams/", "?expand=team.stats")
-teamStat <- full_url_stats("/teams/", 2, "/?expand=team.stats")
-
-# retrieve the NHL stats information and convert it to data frames
-NHLstats <- function(full_url_stats){
-  return(jsonlite::fromJSON(content(GET(full_url_stats),"text"), flatten=TRUE))
-}
-
-# Obtain all team stats and a single team stats
-teamsDf <- NHLstats(teams)$teams
-teamDf <- NHLstats(team)$teams
-teamsStatsDf <- NHLstats(teamsStat)$teams[[8]][[1]]
-teamStatsDf <- NHLstats(teamStat)$teams[[8]][[1]]
-teamsDf
-teamDf
-teamsStatsDf$splits
-teamStatsDf$splits[[1]]
-```   
-
-
-### Make thing even easier and user interactive!   
-
-```{r}
-# Create a wrapper function to return the stats for a given team ID
-teamStat <- function(teamID) {
-  # construct URLs
-  full_url_stats <- function(tab_name, ...){
-  base_url <- "https://statsapi.web.nhl.com/api/v1"
-  return(paste0(base_url, tab_name, ...))
-  }
-
-  teamStat <- full_url_stats("/teams/", teamID, "/?expand=team.stats")
-  # retrieve the NHL records information and convert it to data frames
-  NHLstats <- function(full_url_stats){
-  return(jsonlite::fromJSON(content(GET(full_url_stats),"text"), flatten=TRUE))
-    }
-  teamStatsDf <- NHLstats(teamStat)$teams[[8]][[1]]
-  teamStatsDf$splits[[1]]
-}
-# Call teamStat function to get a team stats
-teamStat(1)
 ```   
 
 ```{r}
-franchiseDf
-franchise_totalsDf
-```
+#franchiseDf
+#franchise_totalsDf
+#franchise_seasonsDf
+#goalieDf
+#skaterDf
+#adminDf
+```   
 
+### Create Plots for NHL Records  
 
-## Exploratory Data Analysis
+Bar plot on goalie and skater information.  
+
 ```{r}
 dim(goalieDf)
 dim(skaterDf)
@@ -140,18 +145,41 @@ skaterDf_new <- cbind(skaterDf,df=rep(2,17209))
 
 goalie_skater <- bind_rows(goalieDf_new, skaterDf_new)
 dim(goalie_skater)
+goalie_skater_new <- filter(goalie_skater, gameTypeId == 2, activePlayer == TRUE)
+goalie_skater_new
 ```   
 
 ```{r franchise_totals bar plot}
-g <- ggplot(data=franchise_totalsDf, aes(x=color))
-g + geom_bar(aes(fill=gameTypeId), position = "dodge") +
-  labs(x="Female Crab Color") + 
-  scale_fill_discrete(name = "")
-```   
+g <- ggplot(data=franchise_totalsDf, aes(x=gameTypeId))
+g + geom_bar(aes(fill=wins)) +
+  labs(x="game Type Id")
+```       
+
+
+Histogram plot on goalie and skater information.     
 
 ```{r}
-adminDf
-```
+
+```    
+
+
+Box plot on goalie and skater information.     
+
+```{r}
+
+```    
+
+
+Scatter plot on goalie and skater information.     
+
+```{r}
+
+```    
+
+
+
+
+
 
 
 
