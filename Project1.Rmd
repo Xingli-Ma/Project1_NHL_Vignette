@@ -125,6 +125,37 @@ teamStat <- function(teamID) {
 teamStat(1)
 ```   
 
+```{r}
+franchiseDf
+franchise_totalsDf
+```
+
+
+## Exploratory Data Analysis
+```{r}
+dim(goalieDf)
+dim(skaterDf)
+goalieDf_new <- cbind(goalieDf,df=rep(1,1078))
+skaterDf_new <- cbind(skaterDf,df=rep(2,17209))
+
+goalie_skater <- bind_rows(goalieDf_new, skaterDf_new)
+dim(goalie_skater)
+```   
+
+```{r franchise_totals bar plot}
+g <- ggplot(data=franchise_totalsDf, aes(x=color))
+g + geom_bar(aes(fill=gameTypeId), position = "dodge") +
+  labs(x="Female Crab Color") + 
+  scale_fill_discrete(name = "")
+```   
+
+```{r}
+adminDf
+```
+
+
+
+
 
 
 
