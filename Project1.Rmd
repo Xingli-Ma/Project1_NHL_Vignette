@@ -1,28 +1,132 @@
 ---
 title: "Project1"
-output: html_document
----
+author: "Xingli Ma"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  github_document:
+    toc: yes
+    toc_depth: 3
+---       
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, error = TRUE, warning = FALSE, message = FALSE, cache = TRUE)
+```         
 
-## R Markdown
+The following R packages are reqired to run the code to create this vignette.    
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+require(rmarkdown)
+require(knitr)
+require(dplyr)
+require(tidyverse)
+require(ggplot2)
+require(DT)
+library(jsonlite)
+library(httr)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
-```
+require(Hmisc)
+require(expss)
+require(bigrquery)
+require(DBI)
+require(RSQLite)
+library(bigrquery)
+library(DBI)
+```             
 
-## Including Plots
 
-You can also embed plots, for example:
+# Introduction      
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
+## NFL Records API         
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+library(jsonlite)
+library(httr)
+# construct URLs
+full_url_records <- function(tab_name){
+  base_url <- "https://records.nhl.com/site/api"
+  return(paste0(base_url, tab_name))
+}
+franchise <- full_url_records("/franchise")
+franchise_totals <- full_url_records("/franchise-team-totals")
+goalie <- full_url_records("/franchise-goalie-records")
+skater <- full_url_records("/franchise-skater-records")
+admin <- full_url_records("/franchise-detail")
+```       
+
+```{r}
+# retrieve the NHL records information and convert it to data frames
+NHLrecords <- function(full_url_records){
+  return(jsonlite::fromJSON(content(GET(full_url_records),"text"), flatten=TRUE))
+}
+franchiseDf <- NHLrecords(franchise)$data
+franchise_totalsDf <- NHLrecords(franchise_totals)$data
+goalieDf <- NHLrecords(goalie)$data
+skaterDf <- NHLrecords(skater)$data
+adminDf <- NHLrecords(admin)$data
+franchiseDf
+franchise_totalsDf
+goalieDf
+skaterDf
+adminDf
+```   
+
+
+## NHL Stats API   
+
+### Explore the data     
+
+```{r}
+# construct URLs
+full_url_stats <- function(tab_name, ...){
+  base_url <- "https://statsapi.web.nhl.com/api/v1"
+  return(paste0(base_url, tab_name, ...))
+}
+teamsStat <- full_url_stats("/teams/", "?expand=team.stats")
+teamStat <- full_url_stats("/teams/", 2, "/?expand=team.stats")
+
+# retrieve the NHL stats information and convert it to data frames
+NHLstats <- function(full_url_stats){
+  return(jsonlite::fromJSON(content(GET(full_url_stats),"text"), flatten=TRUE))
+}
+
+# Obtain all team stats and a single team stats
+teamsDf <- NHLstats(teams)$teams
+teamDf <- NHLstats(team)$teams
+teamsStatsDf <- NHLstats(teamsStat)$teams[[8]][[1]]
+teamStatsDf <- NHLstats(teamStat)$teams[[8]][[1]]
+teamsDf
+teamDf
+teamsStatsDf$splits
+teamStatsDf$splits[[1]]
+```   
+
+
+### Make thing even easier and user interactive!   
+
+```{r}
+# Create a wrapper function to return the stats for a given team ID
+teamStat <- function(teamID) {
+  # construct URLs
+  full_url_stats <- function(tab_name, ...){
+  base_url <- "https://statsapi.web.nhl.com/api/v1"
+  return(paste0(base_url, tab_name, ...))
+  }
+
+  teamStat <- full_url_stats("/teams/", teamID, "/?expand=team.stats")
+  # retrieve the NHL records information and convert it to data frames
+  NHLstats <- function(full_url_stats){
+  return(jsonlite::fromJSON(content(GET(full_url_stats),"text"), flatten=TRUE))
+    }
+  teamStatsDf <- NHLstats(teamStat)$teams[[8]][[1]]
+  teamStatsDf$splits[[1]]
+}
+# Call teamStat function to get a team stats
+teamStat(1)
+```   
+
+
+
+
+
+
