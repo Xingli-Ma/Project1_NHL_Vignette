@@ -14,8 +14,9 @@ June 20, 2021
     -   [Tables Retrieved from NHL Records
         API](#tables-retrieved-from-nhl-records-api)
     -   [Create Plots for NHL Records](#create-plots-for-nhl-records)
+    -   [Numerical summaries](#numerical-summaries)
 
-The following R packages are reqired to run the code to create this
+The following R packages are required to run the code to create this
 vignette.
 
 ``` r
@@ -24,9 +25,8 @@ require(knitr)
 require(dplyr)
 require(tidyverse)
 require(ggplot2)
-require(DT)
-library(jsonlite)
-library(httr)
+require(jsonlite)
+require(httr)
 ```
 
 ## Introduction
@@ -319,42 +319,61 @@ skaterDf <- NHLrecords(skater)$data
 adminDf <- NHLrecords(admin)$data
 ```
 
-``` r
-#franchiseDf
-#franchise_totalsDf
-#franchise_seasonsDf
-#goalieDf
-#skaterDf
-#adminDf
-```
-
 ### Create Plots for NHL Records
 
-Bar plot on goalie and skater information.
+franchise\_totals histogram plot on a newly created variable win
+percentage.
 
 ``` r
-dim(goalieDf)
+# Create a new variable win percentage 
+franchise_totalsDf <- franchise_totalsDf %>% mutate(winPctg=wins/gamesPlayed)
+
+# Create a histogram plot
+d <- ggplot(franchise_totalsDf, aes(x=winPctg))
+d + geom_histogram(bins=20, aes(y=..density..)) + 
+  geom_density(stat="density", adjust=0.4, lwd=3, colour= "red") +
+  xlab("Win Percentage") + ylab("Density") +
+  ggtitle("Histogram for Win Percentage")
 ```
 
-    ## [1] 1078   29
+![](README_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+
+Bar plot on franchise teams totals information.
 
 ``` r
-dim(skaterDf)
+# Convert categorical variable to factors
+franchise_totalsDf$gameTypeId <- as.factor(franchise_totalsDf$gameTypeId)
+# Renaming factor levels
+levels(franchise_totalsDf$gameTypeId) <- c("Regular Season", "Playoffs")
+# Create bar plot
+g <- ggplot(data=franchise_totalsDf, aes(x=gameTypeId))
+g + geom_bar() +
+  labs(x="Game Type Id", title = "Bar plot of game type ID for franchise teams") +
+  scale_x_discrete(labels = c("Regular Season", "Playoffs"))
 ```
 
-    ## [1] 17209    31
+![](README_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+
+Scatter plot on franchise teams totals information.
 
 ``` r
+f <- ggplot(franchise_totalsDf, aes(x = wins, y = homeWins, group = gameTypeId))
+f + geom_point(aes(color= gameTypeId)) +
+  geom_smooth(method=lm, color="green") +
+  ggtitle("Wins vs Home Wins by Game Type")
+```
+
+![](README_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
+Combine two tables and create a new variable to indicate records from
+different tables.
+
+``` r
+# Create an indicator variable
 goalieDf_new <- cbind(goalieDf,df=rep(1,1078))
 skaterDf_new <- cbind(skaterDf,df=rep(2,17209))
-
+# Vertically combine goalie and skater tables 
 goalie_skater <- bind_rows(goalieDf_new, skaterDf_new)
-dim(goalie_skater)
-```
-
-    ## [1] 18287    49
-
-``` r
 goalie_skater_new <- filter(goalie_skater, gameTypeId == 2, activePlayer == TRUE)
 goalie_skater_new
 ```
@@ -592,16 +611,146 @@ goalie_skater_new
     ## 20                <NA>             NA     NA           NA
     ##  [ reached 'max' / getOption("max.print") -- omitted 2096 rows ]
 
+Scatter plot on goalie and skater information.
+
 ``` r
-g <- ggplot(data=franchise_totalsDf, aes(x=gameTypeId))
-g + geom_bar(aes(fill=wins)) +
-  labs(x="game Type Id")
+# Convert categorical variable to factors
+goalie_skater_new$df <- as.factor(goalie_skater_new$df)
+# Renaming factor levels
+levels(goalie_skater_new$df) <- c("goalie", "skater")
+# Create scatter plot
+s <- ggplot(goalie_skater_new, aes(x=gamesPlayed,y=seasons, group=df))
+s + geom_point(aes(color= df)) +
+  geom_smooth(method=lm, color="green") +
+  ggtitle("Games Played vs Goals by Game Type")
 ```
 
-![](README_files/figure-gfm/franchise_totals%20bar%20plot-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
 
-Histogram plot on goalie and skater information.
+Box plot on franchise teams totals information.
 
-Box plot on goalie and skater information.
+``` r
+f <- ggplot(goalie_skater_new, aes(x = positionCode, y = gamesPlayed))
+f + geom_boxplot() +
+   geom_jitter(geom="point")
+```
 
-Scatter plot on goalie and skater information.
+![](README_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+
+### Numerical summaries
+
+Numerical summaries on wins, losses, and ties for each franchise by game
+type.
+
+``` r
+win_loss_tie <- franchise_totalsDf %>% group_by(franchiseId, gameTypeId) %>% summarise(win.avg=round(mean(wins),2), loss.avg=round(mean(losses),2), tie.avg=round(mean(ties),2), wl_ratio=round(wins/losses),2)
+knitr::kable(win_loss_tie )
+```
+
+| franchiseId | gameTypeId     | win.avg | loss.avg | tie.avg | wl\_ratio |   2 |
+|------------:|:---------------|--------:|---------:|--------:|----------:|----:|
+|           1 | Regular Season | 3473.00 |  2302.00 |  837.00 |         2 |   2 |
+|           1 | Playoffs       |  444.00 |   321.00 |    8.00 |         1 |   2 |
+|           2 | Regular Season |    1.00 |     5.00 |    0.00 |         0 |   2 |
+|           3 | Regular Season |  134.50 |   126.00 |   34.50 |         1 |   2 |
+|           3 | Regular Season |  134.50 |   126.00 |   34.50 |         0 |   2 |
+|           3 | Playoffs       |   18.00 |    17.00 |    6.00 |         1 |   2 |
+|           4 | Regular Season |   25.50 |    49.00 |    0.50 |         1 |   2 |
+|           4 | Regular Season |   25.50 |    49.00 |    0.50 |         0 |   2 |
+|           5 | Regular Season | 1000.00 |   943.00 |  261.00 |         1 |   2 |
+|           5 | Regular Season | 1000.00 |   943.00 |  261.00 |         1 |   2 |
+|           5 | Regular Season | 1000.00 |   943.00 |  261.00 |         1 |   2 |
+|           5 | Playoffs       |   89.00 |    97.33 |    1.33 |         1 |   2 |
+|           5 | Playoffs       |   89.00 |    97.33 |    1.33 |         1 |   2 |
+|           5 | Playoffs       |   89.00 |    97.33 |    1.33 |         1 |   2 |
+|           6 | Regular Season | 3241.00 |  2403.00 |  791.00 |         1 |   2 |
+|           6 | Playoffs       |  332.00 |   337.00 |    6.00 |         1 |   2 |
+|           7 | Regular Season |  271.00 |   260.00 |   91.00 |         1 |   2 |
+|           7 | Playoffs       |   20.00 |    21.00 |    9.00 |         1 |   2 |
+|           8 | Regular Season |  127.50 |   201.00 |   63.50 |         1 |   2 |
+|           8 | Regular Season |  127.50 |   201.00 |   63.50 |         1 |   2 |
+|           8 | Playoffs       |    6.00 |    11.00 |    1.00 |         1 |   2 |
+|           9 | Regular Season |   35.50 |    79.00 |   13.50 |         1 |   2 |
+|           9 | Regular Season |   35.50 |    79.00 |   13.50 |         0 |   2 |
+|           9 | Playoffs       |    1.00 |     2.00 |    1.00 |         0 |   2 |
+|          10 | Regular Season | 2883.00 |  2716.00 |  808.00 |         1 |   2 |
+|          10 | Playoffs       |  244.00 |   266.00 |    8.00 |         1 |   2 |
+|          11 | Regular Season | 2812.00 |  2761.00 |  814.00 |         1 |   2 |
+|          11 | Playoffs       |  268.00 |   275.00 |    5.00 |         1 |   2 |
+|          12 | Regular Season |  996.33 |   858.00 |  271.67 |         1 |   2 |
+|          12 | Regular Season |  996.33 |   858.00 |  271.67 |         1 |   2 |
+|          12 | Regular Season |  996.33 |   858.00 |  271.67 |         1 |   2 |
+|          12 | Playoffs       |  108.33 |    98.67 |    0.33 |         1 |   2 |
+|          12 | Playoffs       |  108.33 |    98.67 |    0.33 |         0 |   2 |
+|          12 | Playoffs       |  108.33 |    98.67 |    0.33 |         0 |   2 |
+|          13 | Regular Season |   76.33 |   162.67 |   47.00 |         1 |   2 |
+|          13 | Regular Season |   76.33 |   162.67 |   47.00 |         1 |   2 |
+|          13 | Regular Season |   76.33 |   162.67 |   47.00 |         0 |   2 |
+|          13 | Playoffs       |    3.00 |     8.00 |      NA |         0 |   2 |
+|          14 | Regular Season | 1754.00 |  1829.00 |  424.00 |         1 |   2 |
+|          14 | Playoffs       |  111.00 |   144.00 |      NA |         1 |   2 |
+|          15 | Regular Season |  921.00 |   854.00 |  229.50 |         1 |   2 |
+|          15 | Regular Season |  921.00 |   854.00 |  229.50 |         1 |   2 |
+|          15 | Playoffs       |   92.50 |    90.50 |      NA |         1 |   2 |
+|          15 | Playoffs       |   92.50 |    90.50 |      NA |         1 |   2 |
+|          16 | Regular Season | 2079.00 |  1452.00 |  457.00 |         1 |   2 |
+|          16 | Playoffs       |  231.00 |   218.00 |      NA |         1 |   2 |
+|          17 | Regular Season | 1903.00 |  1734.00 |  383.00 |         1 |   2 |
+|          17 | Playoffs       |  209.00 |   182.00 |      NA |         1 |   2 |
+|          18 | Regular Season | 1929.00 |  1645.00 |  432.00 |         1 |   2 |
+|          18 | Playoffs       |  182.00 |   221.00 |      NA |         1 |   2 |
+|          19 | Regular Season | 1805.00 |  1564.00 |  409.00 |         1 |   2 |
+|          19 | Playoffs       |  124.00 |   132.00 |      NA |         1 |   2 |
+|          20 | Regular Season | 1649.00 |  1746.00 |  391.00 |         1 |   2 |
+|          20 | Playoffs       |  111.00 |   135.00 |      NA |         1 |   2 |
+|          21 | Regular Season |  882.50 |   748.00 |  189.50 |         1 |   2 |
+|          21 | Regular Season |  882.50 |   748.00 |  189.50 |         1 |   2 |
+|          21 | Playoffs       |   52.50 |    66.50 |      NA |         1 |   2 |
+|          21 | Playoffs       |   52.50 |    66.50 |      NA |         0 |   2 |
+|          22 | Regular Season | 1688.00 |  1587.00 |  347.00 |         1 |   2 |
+|          22 | Playoffs       |  171.00 |   139.00 |      NA |         1 |   2 |
+|          23 | Regular Season |  511.33 |   534.00 |  109.33 |         1 |   2 |
+|          23 | Regular Season |  511.33 |   534.00 |  109.33 |         0 |   2 |
+|          23 | Regular Season |  511.33 |   534.00 |  109.33 |         0 |   2 |
+|          23 | Playoffs       |   68.50 |    61.00 |      NA |         1 |   2 |
+|          23 | Playoffs       |   68.50 |    61.00 |      NA |         0 |   2 |
+|          24 | Regular Season | 1700.00 |  1467.00 |  303.00 |         1 |   2 |
+|          24 | Playoffs       |  138.00 |   156.00 |      NA |         1 |   2 |
+|          25 | Regular Season | 1469.00 |  1337.00 |  262.00 |         1 |   2 |
+|          25 | Playoffs       |  160.00 |   112.00 |      NA |         1 |   2 |
+|          26 | Regular Season |  680.50 |   717.00 |  131.50 |         1 |   2 |
+|          26 | Regular Season |  680.50 |   717.00 |  131.50 |         1 |   2 |
+|          26 | Playoffs       |   38.00 |    42.50 |      NA |         1 |   2 |
+|          26 | Playoffs       |   38.00 |    42.50 |      NA |         1 |   2 |
+|          27 | Regular Season |  752.00 |   663.50 |  130.50 |         1 |   2 |
+|          27 | Regular Season |  752.00 |   663.50 |  130.50 |         1 |   2 |
+|          27 | Playoffs       |   79.50 |    69.50 |      NA |         1 |   2 |
+|          27 | Playoffs       |   79.50 |    69.50 |      NA |         1 |   2 |
+|          28 | Regular Season |  445.00 |   489.33 |      NA |         1 |   2 |
+|          28 | Regular Season |  445.00 |   489.33 |      NA |         1 |   2 |
+|          28 | Regular Season |  445.00 |   489.33 |      NA |         1 |   2 |
+|          28 | Playoffs       |   15.00 |    27.67 |      NA |         1 |   2 |
+|          28 | Playoffs       |   15.00 |    27.67 |      NA |         0 |   2 |
+|          28 | Playoffs       |   15.00 |    27.67 |      NA |         1 |   2 |
+|          29 | Regular Season | 1070.00 |   920.00 |  121.00 |         1 |   2 |
+|          29 | Playoffs       |  119.00 |   122.00 |      NA |         1 |   2 |
+|          30 | Regular Season |  971.00 |   940.00 |  115.00 |         1 |   2 |
+|          30 | Playoffs       |   72.00 |    79.00 |      NA |         1 |   2 |
+|          31 | Regular Season |  985.00 |   947.00 |  112.00 |         1 |   2 |
+|          31 | Playoffs       |  101.00 |    76.00 |      NA |         1 |   2 |
+|          32 | Regular Season |  990.00 |   834.00 |  107.00 |         1 |   2 |
+|          32 | Playoffs       |   89.00 |    73.00 |      NA |         1 |   2 |
+|          33 | Regular Season |  889.00 |   870.00 |  142.00 |         1 |   2 |
+|          33 | Playoffs       |   21.00 |    33.00 |      NA |         1 |   2 |
+|          34 | Regular Season |  852.00 |   656.00 |   60.00 |         1 |   2 |
+|          34 | Playoffs       |   54.00 |    67.00 |      NA |         1 |   2 |
+|          35 | Regular Season |  362.00 |   364.50 |      NA |         1 |   2 |
+|          35 | Regular Season |  362.00 |   364.50 |      NA |         1 |   2 |
+|          35 | Playoffs       |    8.00 |    13.50 |      NA |         0 |   2 |
+|          35 | Playoffs       |    8.00 |    13.50 |      NA |         1 |   2 |
+|          36 | Regular Season |  678.00 |   698.00 |   33.00 |         1 |   2 |
+|          36 | Playoffs       |   15.00 |    26.00 |      NA |         1 |   2 |
+|          37 | Regular Season |  759.00 |   599.00 |   55.00 |         1 |   2 |
+|          37 | Playoffs       |   30.00 |    54.00 |      NA |         1 |   2 |
+|          38 | Regular Season |  173.00 |    94.00 |      NA |         2 |   2 |
+|          38 | Playoffs       |   37.00 |    26.00 |      NA |         1 |   2 |

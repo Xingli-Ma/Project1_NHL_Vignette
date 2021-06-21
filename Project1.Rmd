@@ -12,7 +12,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE, eval = TRUE, error = TRUE, warning = FALSE, message = FALSE, cache = TRUE)
 ```         
 
-The following R packages are reqired to run the code to create this vignette.    
+The following R packages are required to run the code to create this vignette.    
 
 ```{r}
 require(rmarkdown)
@@ -20,9 +20,8 @@ require(knitr)
 require(dplyr)
 require(tidyverse)
 require(ggplot2)
-require(DT)
-library(jsonlite)
-library(httr)
+require(jsonlite)
+require(httr)
 ```             
 
 ## Introduction
@@ -90,8 +89,7 @@ team_Stats <- function(teamID, ...) {
 
 # Query NHL stats information according to the team ID or franchise ID given by a user
 team_Stats(1)
-```   
-
+```
 
 ## Exploratory Data Analysis   
 
@@ -124,57 +122,97 @@ skaterDf <- NHLrecords(skater)$data
 adminDf <- NHLrecords(admin)$data
 ```   
 
+
+### Create Plots for NHL Records 
+
+franchise_totals histogram plot on a newly created variable win percentage.
+
 ```{r}
-#franchiseDf
-#franchise_totalsDf
-#franchise_seasonsDf
-#goalieDf
-#skaterDf
-#adminDf
+# Create a new variable win percentage 
+franchise_totalsDf <- franchise_totalsDf %>% mutate(winPctg=wins/gamesPlayed)
+
+# Create a histogram plot
+d <- ggplot(franchise_totalsDf, aes(x=winPctg))
+d + geom_histogram(bins=20, aes(y=..density..)) + 
+  geom_density(stat="density", adjust=0.4, lwd=3, colour= "red") +
+  xlab("Win Percentage") + ylab("Density") +
+  ggtitle("Histogram for Win Percentage")
 ```   
 
-### Create Plots for NHL Records  
-
-Bar plot on goalie and skater information.  
+ 
+Bar plot on franchise teams totals information.
 
 ```{r}
-dim(goalieDf)
-dim(skaterDf)
+# Convert categorical variable to factors
+franchise_totalsDf$gameTypeId <- as.factor(franchise_totalsDf$gameTypeId)
+# Renaming factor levels
+levels(franchise_totalsDf$gameTypeId) <- c("Regular Season", "Playoffs")
+# Create bar plot
+g <- ggplot(data=franchise_totalsDf, aes(x=gameTypeId))
+g + geom_bar() +
+  labs(x="Game Type Id", title = "Bar plot of game type ID for franchise teams") +
+  scale_x_discrete(labels = c("Regular Season", "Playoffs"))
+```    
+
+Scatter plot on franchise teams totals information.     
+
+```{r}
+f <- ggplot(franchise_totalsDf, aes(x = wins, y = homeWins, group = gameTypeId))
+f + geom_point(aes(color= gameTypeId)) +
+  geom_smooth(method=lm, color="green") +
+  ggtitle("Wins vs Home Wins by Game Type")
+```   
+
+
+Combine two tables and create a new variable to indicate records from different tables.
+
+```{r}
+# Create an indicator variable
 goalieDf_new <- cbind(goalieDf,df=rep(1,1078))
 skaterDf_new <- cbind(skaterDf,df=rep(2,17209))
-
+# Vertically combine goalie and skater tables 
 goalie_skater <- bind_rows(goalieDf_new, skaterDf_new)
-dim(goalie_skater)
 goalie_skater_new <- filter(goalie_skater, gameTypeId == 2, activePlayer == TRUE)
 goalie_skater_new
 ```   
 
-```{r franchise_totals bar plot}
-g <- ggplot(data=franchise_totalsDf, aes(x=gameTypeId))
-g + geom_bar(aes(fill=wins)) +
-  labs(x="game Type Id")
-```       
 
 
-Histogram plot on goalie and skater information.     
+
+
+Scatter plot on goalie and skater information.
 
 ```{r}
+# Convert categorical variable to factors
+goalie_skater_new$df <- as.factor(goalie_skater_new$df)
+# Renaming factor levels
+levels(goalie_skater_new$df) <- c("goalie", "skater")
+# Create scatter plot
+s <- ggplot(goalie_skater_new, aes(x=gamesPlayed,y=seasons, group=df))
+s + geom_point(aes(color= df)) +
+  geom_smooth(method=lm, color="green") +
+  ggtitle("Games Played vs Goals by Game Type")
+```  
 
+Box plot on franchise teams totals information.     
+
+```{r}
+f <- ggplot(goalie_skater_new, aes(x = positionCode, y = gamesPlayed))
+f + geom_boxplot() +
+   geom_jitter(geom="point")
 ```    
 
 
-Box plot on goalie and skater information.     
+### Numerical summaries   
+
+Numerical summaries on wins, losses, and ties for each franchise by game type.
 
 ```{r}
+win_loss_tie <- franchise_totalsDf %>% group_by(franchiseId, gameTypeId) %>% summarise(win.avg=round(mean(wins),2), loss.avg=round(mean(losses),2), tie.avg=round(mean(ties),2), wl_ratio=round(wins/losses),2)
+knitr::kable(win_loss_tie )
+```
 
-```    
-
-
-Scatter plot on goalie and skater information.     
-
-```{r}
-
-```    
+  
 
 
 
