@@ -61,7 +61,7 @@ team_Record <- function(teamId_OR_franchiseId, ...){
 }
 
 # Query NHL records information according to the team ID or franchise ID given by a user
-team_Record(2)
+team_Record(1)
 ```  
 
 
@@ -173,7 +173,6 @@ skaterDf_new <- cbind(skaterDf,df=rep(2,17209))
 # Vertically combine goalie and skater tables 
 goalie_skater <- bind_rows(goalieDf_new, skaterDf_new)
 goalie_skater_new <- filter(goalie_skater, gameTypeId == 2, activePlayer == TRUE)
-goalie_skater_new
 ```   
 
 
